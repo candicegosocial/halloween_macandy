@@ -1,0 +1,7 @@
+.git
+.opencode
+config.json
+rsvp.json*
+rsvp.db*
+Dockerfile
+docker-compose.yml

@@ -1,0 +1,12 @@
+services:
+  invite:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - invite-data:/data
+    restart: unless-stopped
+
+volumes:
+  invite-data:

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  Share card source. Edit the title/date/address text below for your party,
+  then regenerate og.png (needs any Chrome):
+  google-chrome --headless --screenshot=og.png --window-size=1200,630 --hide-scrollbars \
+    --virtual-time-budget=8000 "file://$PWD/og.html"
+-->
+<head>
+<meta charset="UTF-8">
+<title>og card</title>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    background: #07030d;
+    background-image:
+      radial-gradient(ellipse 70% 55% at 50% -5%, rgba(120,10,10,.4), transparent),
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(155,92,255,.18), transparent),
+      radial-gradient(ellipse 50% 40% at 85% 105%, rgba(255,106,0,.14), transparent);
+    color: #e8dff5; font-family: Inter, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; text-align: center;
+  }
+  body::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 88% 75% at 50% 45%, transparent 55%, rgba(0,0,0,.6));
+  }
+  .web { position: absolute; top: 0; width: 170px; height: 170px; opacity: .16; }
+  .web-l { left: 0; }
+  .web-r { right: 0; transform: scaleX(-1); }
+  .fog {
+    position: absolute; left: -10%; width: 120%; height: 260px; bottom: -60px; filter: blur(34px); opacity: .4;
+    background:
+      radial-gradient(ellipse 45% 100% at 30% 100%, rgba(155,92,255,.55), transparent 70%),
+      radial-gradient(ellipse 40% 100% at 72% 100%, rgba(255,106,0,.4), transparent 70%),
+      radial-gradient(ellipse 40% 100% at 55% 100%, rgba(124,255,107,.25), transparent 70%);
+  }
+  .critter { position: absolute; opacity: .3; font-size: 44px; }
+  .c1 { top: 70px; left: 130px; transform: rotate(-8deg); }
+  .c2 { top: 60px; right: 150px; font-size: 34px; }
+  .c3 { bottom: 80px; right: 120px; transform: rotate(10deg); }
+  .c4 { bottom: 90px; left: 160px; font-size: 30px; }
+  .candle { font-size: 54px; margin-bottom: 6px; }
+  h1 {
+    font-family: Creepster, cursive; font-size: 108px; letter-spacing: 3px; line-height: .95;
+    color: #ff6a00;
+    text-shadow:
+      0 0 34px rgba(255,106,0,.55), 0 0 90px rgba(155,92,255,.35),
+      3px 5px 0 #8a0f0f, 5px 12px 0 #4a0a0a, 6px 18px 20px rgba(0,0,0,.85);
+  }
+  .tagline { color: #9b5cff; font-weight: 600; letter-spacing: 8px; text-transform: uppercase; font-size: 22px; margin: 18px 0 34px; }
+  .facts { display: flex; gap: 46px; font-size: 27px; font-weight: 600; }
+  .facts div { display: flex; align-items: center; gap: 10px; }
+  .facts .orange { color: #ff6a00; }
+  .facts .green { color: #7CFF6B; }
+  .addr { margin-top: 26px; font-size: 24px; opacity: .8; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<svg class="web web-l" viewBox="0 0 100 100"><g stroke="#cbb6ff" stroke-width="1.2" fill="none">
+  <path d="M0 0 L100 30M0 0 L30 100M0 0 L85 85M0 0 L55 95M0 0 L95 55"/>
+  <path d="M20 0 Q22 22 0 20"/><path d="M40 0 Q48 48 0 40"/><path d="M60 0 Q74 74 0 60"/><path d="M80 0 Q100 100 0 80"/>
+</g></svg>
+<svg class="web web-r" viewBox="0 0 100 100"><g stroke="#cbb6ff" stroke-width="1.2" fill="none">
+  <path d="M0 0 L100 30M0 0 L30 100M0 0 L85 85M0 0 L55 95M0 0 L95 55"/>
+  <path d="M20 0 Q22 22 0 20"/><path d="M40 0 Q48 48 0 40"/><path d="M60 0 Q74 74 0 60"/><path d="M80 0 Q100 100 0 80"/>
+</g></svg>
+<div class="fog"></div>
+<span class="critter c1">👻</span><span class="critter c2">🦇</span>
+<span class="critter c3">🎃</span><span class="critter c4">💀</span>
+<span class="candle">🕯️</span>
+<h1>YOUR HALLOWEEN PARTY</h1>
+<p class="tagline">You've been summoned</p>
+<div class="facts">
+  <div><span class="green">📅</span> Sat, 31 October 2027</div>
+  <div><span class="orange">⏰</span> 19:00 hrs</div>
+  <div><span>Costumes encouraged</span></div>
+</div>
+<p class="addr">📍 123 Example Street, Your City - 000000</p>
+</body>
+</html>

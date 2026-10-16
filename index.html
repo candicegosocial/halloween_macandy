@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__TITLE__</title>
+<meta name="theme-color" content="#07030d">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="__TITLE__">
+<meta property="og:title" content="__TITLE__: you've been summoned">
+<meta property="og:description" content="__OG_DESC__">
+<meta property="og:image" content="__OG_IMAGE__">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="__OG_URL__">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07030d;
+    --panel: #140a20;
+    --orange: #ff6a00;
+    --purple: #9b5cff;
+    --green: #7CFF6B;
+    --blood: #8a0f0f;
+    --text: #e8dff5;
+    /* escalation vars: body.spooky-N overrides these as the party nears */
+    --fog-op: .35;
+    --critter-op: .18;
+    --drift: 1;
+    --web-scale: 1;
+    --blood-op: 0;
+    --scroll: 0;
+  }
+  body.spooky-1 { --fog-op: .5;  --critter-op: .28; --drift: .8;  --web-scale: 1.15; --blood-op: .15; }
+  body.spooky-2 { --fog-op: .62; --critter-op: .36; --drift: .62; --web-scale: 1.35; --blood-op: .3; }
+  body.spooky-3 { --fog-op: .75; --critter-op: .48; --drift: .47; --web-scale: 1.6;  --blood-op: .5; }
+  body.spooky-4 { --fog-op: .9;  --critter-op: .62; --drift: .34; --web-scale: 1.9;  --blood-op: .7; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse 70% 45% at 50% -5%, rgba(120,10,10,.35), transparent),
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(155,92,255,.16), transparent),
+      radial-gradient(ellipse 50% 30% at 85% 100%, rgba(255,106,0,.10), transparent);
+    color: var(--text);
+    font-family: Inter, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; position: relative; z-index: 4; }
+
+  /* candle-flicker vignette over the whole page */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse 90% 70% at 50% 42%, transparent 52%, rgba(0,0,0,.65));
+    animation: candlelight calc(6s * var(--drift)) ease-in-out infinite;
+  }
+  @keyframes candlelight {
+    0%,100% { opacity: .92; }
+    42% { opacity: .72; }
+    45% { opacity: 1; }
+    70% { opacity: .84; }
+  }
+
+  /* blood-red sky that deepens as the party nears */
+  .bloodgrow {
+    position: fixed; top: -140px; left: 0; width: 100%; height: 380px; z-index: 1;
+    pointer-events: none; opacity: var(--blood-op);
+    background: radial-gradient(ellipse 60% 100% at 50% 0%, rgba(170,12,12,.55), transparent 70%);
+  }
+  /* the deeper you scroll, the darker the crypt gets */
+  .deepen { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: calc(var(--scroll) * .4); background: #000; }
+
+  /* the dead rise from below the fold as you scroll down */
+  .riser {
+    position: fixed; bottom: -70px; z-index: 2; pointer-events: none; font-size: 2.4rem;
+    opacity: calc(var(--critter-op) + var(--scroll) * .4);
+    transform: translateY(calc(var(--scroll) * -170px));
+  }
+  .r1 { left: 10%; }
+  .r2 { right: 9%; font-size: 1.8rem; }
+
+  /* one-time ghost fly-by when the RSVP section is reached */
+  .scare-ghost { position: fixed; top: 26%; left: -90px; font-size: 3.2rem; opacity: 0; z-index: 6; pointer-events: none; }
+  @keyframes flyby {
+    0% { opacity: 0; transform: translate(0,0) rotate(-12deg); }
+    20% { opacity: .55; }
+    80% { opacity: .45; }
+    100% { opacity: 0; transform: translate(calc(100vw + 180px), -70px) rotate(14deg); }
+  }
+  .scare-ghost.fly { animation: flyby 2.8s ease-in-out forwards; }
+
+  /* sections rise from the grave as they scroll into view (only with JS) */
+  body.js section { opacity: 0; transform: translateY(28px); transition: opacity .8s ease, transform .8s ease; }
+  body.js section.seen { opacity: 1; transform: none; }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: #0b0512; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(#8a0f0f, #ff6a00); border-radius: 6px; box-shadow: 0 0 8px rgba(255,60,60,.5); }
+
+  /* drifting grave fog, parallaxed sideways by scroll depth */
+  .fogscroll {
+    position: fixed; left: 0; bottom: 0; width: 100%; height: 240px;
+    pointer-events: none; z-index: 1; transform: translateX(calc(var(--scroll) * 42px));
+  }
+  .fog { position: absolute; left: -20%; width: 140%; height: 240px; filter: blur(30px); }
+  .fog-a {
+    bottom: -50px; opacity: calc(var(--fog-op) * 1.15);
+    background: radial-gradient(ellipse 45% 100% at 30% 100%, rgba(155,92,255,.55), transparent 70%),
+                radial-gradient(ellipse 40% 100% at 72% 100%, rgba(255,106,0,.35), transparent 70%);
+    animation: fogdrift calc(34s * var(--drift)) linear infinite alternate;
+  }
+  .fog-b {
+    bottom: -20px; opacity: calc(var(--fog-op) * .8);
+    background: radial-gradient(ellipse 50% 100% at 60% 100%, rgba(124,255,107,.3), transparent 70%);
+    animation: fogdrift calc(22s * var(--drift)) linear infinite alternate-reverse;
+  }
+  @keyframes fogdrift { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
+
+  /* cobwebs in the corners */
+  .web { position: fixed; top: 0; width: 130px; height: 130px; opacity: .15; z-index: 3; pointer-events: none; }
+  .web-l { left: 0; transform: scale(var(--web-scale)) rotate(calc(var(--scroll) * 3deg)); transform-origin: top left; }
+  .web-r { right: 0; transform: scaleX(-1) scale(var(--web-scale)) rotate(calc(var(--scroll) * 3deg)); transform-origin: top right; }
+
+  /* spider hanging on a thread: the silk stays anchored at the top and
+     stretches; the spider rides its end */
+  .spider {
+    position: fixed; top: 0; right: 22%; z-index: 3; display: flex; flex-direction: column;
+    align-items: center; pointer-events: none;
+  }
+  .spider::before {
+    content: ""; width: 1px; height: 90px; background: rgba(230,225,245,.45);
+    animation: silk calc(14s * var(--drift)) ease-in-out infinite;
+  }
+  .spider span { font-size: 1.5rem; margin-top: -4px; }
+  @keyframes silk {
+    0% { height: 90px; }
+    25%, 55% { height: 270px; }
+    85%, 100% { height: 90px; }
+  }
+
+  /* floating spooks */
+  .critter { position: fixed; opacity: var(--critter-op); pointer-events: none; z-index: 2; animation: drift 18s ease-in-out infinite; }
+  .g1 { top: 15%; left: 6%; font-size: 2rem; animation-duration: calc(22s * var(--drift)); }
+  .g2 { top: 55%; right: 8%; font-size: 1.4rem; animation-duration: calc(16s * var(--drift)); animation-delay: -8s; }
+  .b1 { top: 8%; right: 20%; font-size: 1.3rem; animation-duration: calc(12s * var(--drift)); animation-delay: -3s; }
+  .b2 { top: 30%; left: 15%; font-size: 1.1rem; animation-duration: calc(15s * var(--drift)); animation-delay: -11s; }
+  .b3 { top: 72%; left: 70%; font-size: 1.6rem; animation-duration: calc(19s * var(--drift)); animation-delay: -5s; }
+  .sk1 { bottom: 12%; left: 8%; font-size: 1.5rem; animation-duration: calc(26s * var(--drift)); }
+  /* reinforcements that arrive as the day draws near */
+  .extra { display: none; }
+  body.spooky-1 .extra, body.spooky-2 .extra, body.spooky-3 .extra, body.spooky-4 .extra { display: block; }
+  .e1 { top: 42%; left: 3%; font-size: 1.4rem; animation-duration: calc(17s * var(--drift)); }
+  .e2 { top: 24%; right: 5%; font-size: 1.2rem; animation-duration: calc(21s * var(--drift)); animation-delay: -9s; }
+  .e3 { bottom: 26%; right: 14%; font-size: 1.8rem; animation-duration: calc(24s * var(--drift)); animation-delay: -6s; }
+  .more { display: none; }
+  body.spooky-3 .more, body.spooky-4 .more { display: block; }
+  .m1 { top: 60%; left: 22%; font-size: 1.5rem; animation-duration: calc(13s * var(--drift)); animation-delay: -4s; }
+  .m2 { top: 36%; right: 26%; font-size: 1.3rem; animation-duration: calc(18s * var(--drift)); animation-delay: -13s; }
+  .m3 { bottom: 8%; left: 45%; font-size: 2rem; animation-duration: calc(20s * var(--drift)); animation-delay: -7s; }
+  @keyframes drift {
+    0%,100% { transform: translate(0,0) rotate(-4deg); }
+    50% { transform: translate(20px,-28px) rotate(5deg); }
+  }
+
+  header { text-align: center; margin-bottom: 36px; }
+  .candle { font-size: 2.6rem; display: inline-block; animation: flicker 2.2s infinite; transform-origin: bottom center; }
+  @keyframes flicker {
+    0%,100% { opacity: 1; transform: scale(1); }
+    42% { opacity: .82; transform: scale(.97); }
+    45% { opacity: 1; transform: scale(1.02); }
+    70% { opacity: .88; }
+  }
+  h1 {
+    font-family: Creepster, cursive;
+    font-size: clamp(2.6rem, 9vw, 4.5rem);
+    letter-spacing: 2px;
+    color: var(--orange);
+    /* blood-drip shadow under the title */
+    text-shadow:
+      0 0 24px rgba(255,106,0,.55),
+      0 0 60px rgba(155,92,255,.35),
+      2px 3px 0 var(--blood),
+      3px 8px 0 #4a0a0a,
+      4px 12px 14px rgba(0,0,0,.85);
+    margin: 8px 0 4px;
+    line-height: 1.05;
+  }
+  /* the title reddens and starts to breathe as the night nears */
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+  body.spooky-2 h1 { color: #ff4d00; }
+  body.spooky-3 h1 { color: #ff2a00; animation: breathe 3s ease-in-out infinite; }
+  body.spooky-4 h1 {
+    color: #ff1a00;
+    animation: breathe 1.5s ease-in-out infinite;
+    text-shadow:
+      0 0 34px rgba(255,40,0,.75), 0 0 90px rgba(155,92,255,.4),
+      2px 3px 0 var(--blood), 3px 11px 0 #4a0a0a, 4px 18px 22px rgba(0,0,0,.9);
+  }
+  .tagline { color: var(--purple); font-weight: 600; letter-spacing: 4px; text-transform: uppercase; font-size: .8rem; }
+
+  .countdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 440px; margin: 28px auto; }
+  .cd-cell {
+    background: var(--panel);
+    border: 1px solid rgba(155,92,255,.35);
+    border-radius: 12px;
+    padding: clamp(10px, 2.5vw, 14px) clamp(4px, 2vw, 16px);
+    min-width: 0;
+    text-align: center;
+    box-shadow: 0 0 18px rgba(155,92,255,.12) inset, 0 6px 20px rgba(0,0,0,.5);
+  }
+  .cd-cell:only-child { grid-column: 1 / -1; }
+  .cd-num { font-family: Creepster, cursive; font-size: clamp(1.4rem, 6.5vw, 2rem); color: var(--green); text-shadow: 0 0 12px rgba(124,255,107,.5); }
+  /* countdown digits heat up: green → ember → blood, shaking on the final day */
+  @keyframes shake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-1px,1px); } 50% { transform: translate(1px,-1px); } 75% { transform: translate(-1px,0); } }
+  body.spooky-2 .cd-num { color: #ffa000; text-shadow: 0 0 12px rgba(255,160,0,.55); }
+  body.spooky-3 .cd-num { color: #ff6a3c; text-shadow: 0 0 12px rgba(255,106,60,.6); }
+  body.spooky-4 .cd-num { color: #ff3518; text-shadow: 0 0 14px rgba(255,53,24,.7); animation: shake .4s infinite; }
+  .cd-lbl { font-size: clamp(.52rem, 2vw, .65rem); text-transform: uppercase; letter-spacing: clamp(.5px, .4vw, 2px); opacity: .65; }
+
+  section {
+    background: var(--panel);
+    border: 1px solid rgba(155,92,255,.14);
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.55);
+  }
+  h2 { font-family: Creepster, cursive; font-size: 1.6rem; color: var(--purple); margin-bottom: 12px; letter-spacing: 1px; }
+  .detail-row { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; }
+  .detail-row .icon { font-size: 1.2rem; }
+  .address { color: var(--orange); font-weight: 600; }
+
+  #raceMap { height: 320px; border-radius: 12px; z-index: 0; background: #0d0618; }
+  /* dark-themed map chrome */
+  .leaflet-control-zoom a { background: #140a20; color: var(--purple); border-color: rgba(155,92,255,.3); }
+  .leaflet-control-zoom a:hover { background: #1d1030; }
+  .leaflet-control-attribution { background: rgba(11,5,18,.75) !important; }
+  .leaflet-control-attribution a { color: rgba(155,92,255,.7); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #140a20; color: var(--text); }
+  .leaflet-popup-content { margin: 10px 14px; font-size: .85rem; }
+  .leaflet-container a { color: var(--orange); }
+  .spooky-icon { background: none; border: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,.8)); }
+  .race-status { font-size: .85rem; margin-bottom: 8px; opacity: .85; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.off { background: #666; }
+  .hint { font-size: .78rem; opacity: .6; margin-top: 8px; }
+
+  form { display: grid; gap: 10px; }
+  input {
+    background: #0d0618; border: 1px solid rgba(155,92,255,.4); border-radius: 10px;
+    color: var(--text); padding: 12px 14px; font: inherit; width: 100%;
+  }
+  input:focus { outline: 2px solid var(--purple); }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choice {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: #0d0618; border: 1px solid rgba(155,92,255,.4); border-radius: 12px;
+    padding: 16px 10px; cursor: pointer; text-align: center;
+    transition: border-color .15s, box-shadow .15s, transform .15s;
+  }
+  .choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice-emoji { font-size: 1.9rem; filter: grayscale(.6) brightness(.7); transition: filter .15s, transform .15s; }
+  .choice-txt { font-family: Creepster, cursive; letter-spacing: 1px; font-size: 1.05rem; opacity: .8; }
+  .choice:hover { border-color: var(--purple); }
+  .choice:has(input:focus-visible) { outline: 2px solid var(--purple); outline-offset: 2px; }
+  .choice:has(input:checked) {
+    border-color: var(--orange);
+    box-shadow: 0 0 20px rgba(255,106,0,.35), inset 0 0 16px rgba(255,106,0,.12);
+    transform: rotate(-1.5deg);
+  }
+  .choice.no:has(input:checked) {
+    border-color: #ff5555;
+    box-shadow: 0 0 20px rgba(255,60,60,.35), inset 0 0 16px rgba(255,60,60,.12);
+    transform: rotate(1.5deg);
+  }
+  .choice input:checked ~ .choice-emoji { filter: none; transform: scale(1.2); }
+  .choice input:checked ~ .choice-txt { opacity: 1; }
+  .choice:has(input:checked) .choice-txt { color: var(--orange); }
+  .choice.no:has(input:checked) .choice-txt { color: #ff8080; }
+  input::placeholder { color: rgba(232,223,245,.35); }
+  button {
+    background: linear-gradient(135deg, var(--orange), #c926ff);
+    border: 0; border-radius: 10px; color: #fff; font-weight: 700;
+    padding: 13px; font-size: 1rem; cursor: pointer; letter-spacing: 1px;
+    box-shadow: 0 0 22px rgba(255,106,0,.35);
+    transition: filter .15s, box-shadow .15s;
+  }
+  button:hover { filter: brightness(1.15); box-shadow: 0 0 34px rgba(255,106,0,.6); }
+  #rsvpMsg { text-align: center; font-weight: 600; min-height: 1.2em; }
+  #rsvpMsg.yes { color: var(--green); }
+  #rsvpMsg.no { color: #ff7070; }
+  #rsvpList { margin-top: 12px; font-size: .85rem; opacity: .75; }
+
+  footer { text-align: center; font-size: .8rem; opacity: .5; margin-top: 30px; }
+</style>
+</head>
+<body>
+<span class="critter g1">👻</span><span class="critter g2">🎃</span>
+<span class="critter b1">🦇</span><span class="critter b2">🦇</span><span class="critter b3">🕷️</span>
+<span class="critter sk1">💀</span>
+<span class="critter extra e1">🕸️</span><span class="critter extra e2">😈</span><span class="critter extra e3">🩸</span>
+<span class="critter more m1">🧛</span><span class="critter more m2">🐸</span><span class="critter more m3">🔮</span>
+<span class="riser r1">👻</span><span class="riser r2">☠️</span>
+<span class="scare-ghost">👻</span>
+<div class="bloodgrow"></div>
+<div class="deepen"></div>
+<div class="fogscroll"><div class="fog fog-a"></div><div class="fog fog-b"></div></div>
+<svg class="web web-l" viewBox="0 0 100 100"><g stroke="#cbb6ff" stroke-width="1.2" fill="none">
+  <path d="M0 0 L100 30M0 0 L30 100M0 0 L85 85M0 0 L55 95M0 0 L95 55"/>
+  <path d="M20 0 Q22 22 0 20"/><path d="M40 0 Q48 48 0 40"/><path d="M60 0 Q74 74 0 60"/><path d="M80 0 Q100 100 0 80"/>
+</g></svg>
+<svg class="web web-r" viewBox="0 0 100 100"><g stroke="#cbb6ff" stroke-width="1.2" fill="none">
+  <path d="M0 0 L100 30M0 0 L30 100M0 0 L85 85M0 0 L55 95M0 0 L95 55"/>
+  <path d="M20 0 Q22 22 0 20"/><path d="M40 0 Q48 48 0 40"/><path d="M60 0 Q74 74 0 60"/><path d="M80 0 Q100 100 0 80"/>
+</g></svg>
+<div class="spider"><span>🕷️</span></div>
+<main>
+  <header>
+    <span class="candle">🕯️</span>
+    <h1>__TITLE__</h1>
+    <p class="tagline">__TAGLINE__</p>
+  </header>
+
+  <div class="countdown" id="countdown">
+    <div class="cd-cell"><div class="cd-num" id="cd-d">--</div><div class="cd-lbl">Days</div></div>
+    <div class="cd-cell"><div class="cd-num" id="cd-h">--</div><div class="cd-lbl">Hours</div></div>
+    <div class="cd-cell"><div class="cd-num" id="cd-m">--</div><div class="cd-lbl">Minutes</div></div>
+    <div class="cd-cell"><div class="cd-num" id="cd-s">--</div><div class="cd-lbl">Seconds</div></div>
+  </div>
+
+  <section>
+    <h2>📜 The Summoning</h2>
+    <div class="detail-row"><span class="icon">📅</span><span>__DATE_ROW__</span></div>
+    <div class="detail-row"><span class="icon">⏰</span><span>__TIME_ROW__</span></div>
+    <div class="detail-row"><span class="icon">📍</span><span class="address">__ADDRESS__</span></div>
+    <div class="detail-row"><span class="icon">👗</span><span>__COSTUME__</span></div>
+  </section>
+
+  <section>
+    <h2>🗺️ The Lair &amp; The Race</h2>
+    <p class="race-status" id="raceStatus"><span class="dot off"></span>…</p>
+    <div id="raceMap"></div>
+    <p class="hint" id="raceHint"></p>
+  </section>
+
+  <section id="rsvpSection">
+    <h2>💀 RSVP or Be Doomed</h2>
+    <form id="rsvpForm">
+      <input id="rName" placeholder="Your mortal name" required maxlength="40">
+      <div class="choices">
+        <label class="choice">
+          <input type="radio" name="rsvp" value="yes" checked>
+          <span class="choice-emoji">🦴</span>
+          <span class="choice-txt">I shall attend</span>
+        </label>
+        <label class="choice no">
+          <input type="radio" name="rsvp" value="no">
+          <span class="choice-emoji">⚰️</span>
+          <span class="choice-txt">Merely human</span>
+        </label>
+      </div>
+      <button type="submit">Commit Your Soul</button>
+    </form>
+    <p id="rsvpMsg"></p>
+    <div id="rsvpList"></div>
+    <p class="hint" id="rsvpHint"></p>
+  </section>
+
+  <footer>Built by dark magic • Do not reply to this email (there is no email)</footer>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>/*__PARTY__*/</script>
+<script>
+// party config injected by server.js from config.json
+const P = window.PARTY;
+
+// Countdown to the party
+const TARGET = new Date(P.datetime);
+function tick() {
+  let ms = TARGET - new Date();
+  if (ms <= 0) { document.getElementById("countdown").innerHTML = '<div class="cd-cell"><div class="cd-num">IT HAS BEGUN</div></div>'; return; }
+  const s = Math.floor(ms / 1000);
+  document.getElementById("cd-d").textContent = Math.floor(s / 86400);
+  document.getElementById("cd-h").textContent = String(Math.floor(s / 3600) % 24).padStart(2, "0");
+  document.getElementById("cd-m").textContent = String(Math.floor(s / 60) % 60).padStart(2, "0");
+  document.getElementById("cd-s").textContent = String(s % 60).padStart(2, "0");
+}
+tick(); setInterval(tick, 1000);
+
+// the site gets spookier as the party approaches: 0 = >7 days out, 4 = day-of
+const HOURS_LEFT = (TARGET - Date.now()) / 36e5;
+const LEVEL = HOURS_LEFT <= 4 ? 4 : HOURS_LEFT <= 24 ? 3 : HOURS_LEFT <= 72 ? 2 : HOURS_LEFT <= 168 ? 1 : 0;
+document.body.classList.add("spooky-" + LEVEL);
+document.body.classList.add("js");
+
+// scroll depth drives the crypt: darkness, rising dead, fog parallax, web sway
+addEventListener("scroll", () => {
+  if (window.__sc) return;
+  window.__sc = requestAnimationFrame(() => {
+    const max = document.body.scrollHeight - innerHeight;
+    document.documentElement.style.setProperty("--scroll", Math.min(1, scrollY / (max || 1)));
+    window.__sc = null;
+  });
+}, { passive: true });
+
+// sections rise from the grave on entry; RSVP gets a one-time ghost fly-by
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) {
+    e.target.classList.add("seen");
+    if (e.target.id === "rsvpSection") document.querySelector(".scare-ghost").classList.add("fly");
+    io.unobserve(e.target);
+  }
+}, { threshold: 0.18 });
+document.querySelectorAll("section").forEach((s) => io.observe(s));
+
+// Race window: ±12h around party time. ?racetest=1 opens the client-side gate
+// for testing; the server independently rejects pings outside its own window,
+// so production capture stays sealed.
+const TEST_MODE = new URLSearchParams(location.search).has("racetest");
+const RACE_OPEN = new Date(TARGET.valueOf() - 12 * 36e5);
+const RACE_CLOSE = new Date(TARGET.valueOf() + 12 * 36e5);
+const raceOpen = () => TEST_MODE || (Date.now() >= RACE_OPEN && Date.now() < RACE_CLOSE);
+
+const VENUE = P.venue;
+const ADDR = P.address;
+const GMAPS_DIR = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(ADDR);
+
+// One map for everything: directions always, live race on the 31st
+const map = L.map("raceMap").setView(VENUE, 14);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap",
+}).addTo(map);
+// night-mode the stock OSM tiles, and fade them into the panel so labels/texture
+// recede; markers, popups and routes live on other panes and stay full-contrast
+document.querySelector(".leaflet-tile-pane").style.filter = "invert(1) hue-rotate(180deg) saturate(.5) brightness(.78) contrast(1.05)";
+document.querySelector(".leaflet-tile-pane").style.opacity = ".55";
+const spookyIcon = (emoji, size) => L.divIcon({
+  html: `<span style="font-size:${size}px">${emoji}</span>`,
+  className: "spooky-icon", iconSize: [size, size], iconAnchor: [size / 2, size],
+});
+L.marker(VENUE, { icon: spookyIcon("🏚️", 30) }).addTo(map).bindPopup(
+  "<b>🏚️ The Lair</b><br>" + ADDR + "<br><a href='" + GMAPS_DIR + "' target='_blank' rel='noopener'>📍 Get directions</a>"
+).openPopup();
+
+let me = localStorage.getItem("spookyName") || "";
+let serverUp = false;
+let watchId = null;
+
+function setRaceStatus(html) { document.getElementById("raceStatus").innerHTML = html; }
+function setHint(t) { document.getElementById("raceHint").textContent = t; }
+
+// RSVP + live race: talks to server.js; degrades silently on static hosting
+async function api(path, body) {
+  const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {};
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+function renderGuests(g) {
+  const el = document.getElementById("rsvpList");
+  const yes = (g || []).filter(x => x.status === "yes").map(x => x.name.replace(/[<>&]/g, ""));
+  el.innerHTML = yes.length ? "✅ The coven gathers: " + yes.join(", ") : "";
+}
+
+document.getElementById("rsvpForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("rName").value.trim();
+  const status = document.querySelector('input[name="rsvp"]:checked').value;
+  const msg = document.getElementById("rsvpMsg");
+  try {
+    await api("/api/rsvp", { name, status });
+    me = name; localStorage.setItem("spookyName", name);
+    msg.textContent = status === "yes" ? "✅ Your soul is on the list. See you on the 31st." : "⚰️ The spirits will miss you.";
+    msg.className = status;
+    if (serverUp && raceOpen()) watchLocation();
+  } catch {
+    msg.textContent = "⚠️ The server is offline, RSVP not saved.";
+    msg.className = "no";
+  }
+});
+
+const markers = {};
+const routeLines = {};
+const routeFetched = {};
+const PALETTE = ["#ff6a00", "#9b5cff", "#4dc3ff", "#ff4dd2", "#ffd24d"];
+let paletteIdx = 0;
+
+// shortest walkable path guest → lair, via the public OSRM demo (no key; if it
+// rate-limits on party night, routes just skip, markers still track live)
+async function drawRoute(name, lat, lng) {
+  if (!raceOpen()) return;
+  if (Date.now() - (routeFetched[name] || 0) < 30000) return;
+  routeFetched[name] = Date.now();
+  try {
+    const r = await fetch(`https://router.project-osrm.org/route/v1/foot/${lng},${lat};${VENUE[1]},${VENUE[0]}?overview=full&geometries=geojson`);
+    const j = await r.json();
+    if (!j.routes || !j.routes.length) return;
+    const line = j.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
+    if (routeLines[name]) routeLines[name].setLatLngs(line);
+    else {
+      const color = name === me ? "#7CFF6B" : PALETTE[paletteIdx++ % PALETTE.length];
+      routeLines[name] = L.polyline(line, { color, weight: 3, opacity: .75 }).addTo(map);
+    }
+  } catch {}
+}
+
+function fitAll() {
+  const pts = Object.values(markers).map((m) => m.getLatLng()).concat([L.latLng(VENUE)]);
+  if (pts.length > 1) map.fitBounds(L.latLngBounds(pts), { padding: [40, 40] });
+}
+
+function setMarker(name, lat, lng, isMe) {
+  const isNew = !markers[name];
+  if (isNew) { markers[name] = L.marker([lat, lng], { icon: spookyIcon(isMe ? "🎃" : "👻", 26) }).addTo(map).bindPopup(name.replace(/[<>&]/g, "")); if (raceOpen()) fitAll(); }
+  else markers[name].setLatLng([lat, lng]);
+  if (isMe) map.setView([lat, lng], 14);
+  drawRoute(name, lat, lng);
+}
+
+// Only ever called inside the race window; no tracking before or after
+function watchLocation() {
+  if (!navigator.geolocation || watchId) return;
+  watchId = navigator.geolocation.watchPosition(async (p) => {
+    if (!me || !serverUp || !raceOpen()) return;
+    try { await api("/api/ping", { name: me, lat: p.coords.latitude, lng: p.coords.longitude }); } catch {}
+  }, () => {}, { enableHighAccuracy: true, maximumAge: 10000 });
+}
+
+function onState(st) {
+  renderGuests(st.guests);
+  for (const [n, v] of Object.entries(st.pings || {})) setMarker(n, v.lat, v.lng, n === me);
+}
+
+function updateRaceMode() {
+  if (!raceOpen()) {
+    setRaceStatus('<span class="dot off"></span>The Race of the Dead is sealed until Halloween night (31 Oct, IST). No location is captured until then.');
+    setHint("Until then, the map shows how to find the lair. Tap the pin for directions.");
+    if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  } else if (serverUp) {
+    setRaceStatus('<span class="dot on"></span>🏁 The race is LIVE: allow location to show up on the map as you travel to the lair.');
+    setHint("");
+    watchLocation();
+  }
+}
+
+// boot: probe server, then stream updates
+(async () => {
+  if (me) document.getElementById("rName").value = me;
+  try {
+    const st = await api("/api/state");
+    serverUp = true;
+    onState(st);
+    // live stream, with polling fallback for serverless hosts that cut streams
+    let polled = false;
+    const startPolling = () => {
+      if (polled) return;
+      polled = true;
+      setInterval(async () => {
+        try { onState(await api("/api/state")); } catch {}
+      }, 5000);
+    };
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => onState(JSON.parse(e.data));
+    es.onerror = () => { es.close(); startPolling(); };
+    setTimeout(startPolling, 8000);  // no stream message by then: poll instead
+  } catch {
+    setRaceStatus('<span class="dot off"></span>Offline mode: RSVP is unavailable right now.');
+    setHint("If RSVP fails, just show up. It's a party, not the IRS.");
+  }
+  updateRaceMode();
+  setInterval(updateRaceMode, 30000);
+})();
+</script>
+</body>
+</html>
